@@ -34,7 +34,7 @@ import qbt.options.ManifestOptionsDelegate;
 import qbt.options.ManifestOptionsResult;
 import qbt.options.RepoActionOptionsDelegate;
 import qbt.repo.LocalRepoAccessor;
-import qbt.repo.RemoteRepoAccessor;
+import qbt.repo.PinnedRepoAccessor;
 import qbt.utils.ProcessHelper;
 import qbt.vcs.Repository;
 import qbt.vcs.VcsRegistry;
@@ -111,7 +111,7 @@ public final class Commit extends QbtCommand<Commit.Options> {
 
             final VcsVersionDigest manifestRepoVersion = repoManifest.version;
             LOGGER.debug("[" + repo + "] manifestRepoVersion = " + manifestRepoVersion);
-            final RemoteRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, repoManifest.version);
+            final PinnedRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, repoManifest.version);
             pinnedAccessor.remote.findCommit(localRepoAccessor.dir, ImmutableList.of(manifestRepoVersion));
 
             class CommitMakerMaker {

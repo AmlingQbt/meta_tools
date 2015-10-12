@@ -29,7 +29,7 @@ import qbt.config.QbtConfig;
 import qbt.diffmanifests.MapDiffer;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.repo.LocalRepoAccessor;
-import qbt.repo.RemoteRepoAccessor;
+import qbt.repo.PinnedRepoAccessor;
 import qbt.utils.ProcessHelper;
 import qbt.vcs.CachedRemote;
 import qbt.vcs.LocalVcs;
@@ -213,7 +213,7 @@ public class Sdiff extends QbtCommand<Sdiff.Options> {
                     if(localVcs != null && localVcs.getRepository(dir).commitExists(version)) {
                         continue;
                     }
-                    RemoteRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, version);
+                    PinnedRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, version);
                     CachedRemote remote = pinnedAccessor.remote;
                     LocalVcs localVcs2 = remote.getLocalVcs();
                     if(localVcs == null) {
