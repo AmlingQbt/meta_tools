@@ -112,7 +112,7 @@ public final class Commit extends QbtCommand<Commit.Options> {
             final VcsVersionDigest manifestRepoVersion = repoManifest.version;
             LOGGER.debug("[" + repo + "] manifestRepoVersion = " + manifestRepoVersion);
             final PinnedRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, repoManifest.version);
-            pinnedAccessor.remote.findCommit(localRepoAccessor.dir, ImmutableList.of(manifestRepoVersion));
+            pinnedAccessor.findCommit(localRepoAccessor.dir);
 
             class CommitMakerMaker {
                 public boolean make() {
@@ -124,7 +124,7 @@ public final class Commit extends QbtCommand<Commit.Options> {
                         @Override
                         public VcsVersionDigest commit(String message) {
                             VcsVersionDigest commit = commitMaker.commit(message);
-                            pinnedAccessor.remote.addPin(localRepoAccessor.dir, commit);
+                            pinnedAccessor.addPin(localRepoAccessor.dir, commit);
                             return commit;
                         }
                     });
