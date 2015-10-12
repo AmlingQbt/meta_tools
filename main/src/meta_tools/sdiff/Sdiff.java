@@ -213,8 +213,8 @@ public class Sdiff extends QbtCommand<Sdiff.Options> {
                     if(localVcs != null && localVcs.getRepository(dir).commitExists(version)) {
                         continue;
                     }
-                    RemoteRepoAccessor remoteRepoAccessor = config.repoConfig.requireRemoteRepo(repo, version);
-                    CachedRemote remote = remoteRepoAccessor.remote;
+                    RemoteRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repo, version);
+                    CachedRemote remote = pinnedAccessor.remote;
                     LocalVcs localVcs2 = remote.getLocalVcs();
                     if(localVcs == null) {
                         localVcs = localVcs2;

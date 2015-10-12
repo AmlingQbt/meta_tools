@@ -120,8 +120,8 @@ public final class OverrideStatus extends QbtCommand<OverrideStatus.Options> {
         String oneliner = CommitDataUtils.getOneLiner(overrideRepository, overrideRepository.getCurrentCommit());
 
         if(!overrideRepository.commitExists(canonicalHash)) {
-            RemoteRepoAccessor remoteRepoAccessor = config.repoConfig.requireRemoteRepo(repoTip, canonicalHash);
-            remoteRepoAccessor.remote.findCommit(repoPath, ImmutableList.of(canonicalHash));
+            RemoteRepoAccessor pinnedAccessor = config.localPinsRepo.requirePin(repoTip, canonicalHash);
+            pinnedAccessor.remote.findCommit(repoPath, ImmutableList.of(canonicalHash));
         }
         String canonicalOneliner = CommitDataUtils.getOneLiner(overrideRepository, canonicalHash);
 

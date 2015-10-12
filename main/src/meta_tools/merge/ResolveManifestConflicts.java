@@ -224,7 +224,7 @@ public class ResolveManifestConflicts extends QbtCommand<ResolveManifestConflict
                     stepsBuilder.add(new Step() {
                         @Override
                         public StepResult run() {
-                            RemoteRepoAccessor lhsResult = config.repoConfig.requireRemoteRepo(repo, lhsVersion);
+                            RemoteRepoAccessor lhsResult = config.localPinsRepo.requirePin(repo, lhsVersion);
                             lhsResult.remote.findCommit(overrideRepo.getRoot(), ImmutableList.of(lhsVersion));
                             overrideRepo.checkout(lhsVersion);
                             return new StepResult(ImmutableList.<Pair<PackageTip, VcsVersionDigest>>of(), false);
@@ -244,11 +244,11 @@ public class ResolveManifestConflicts extends QbtCommand<ResolveManifestConflict
                     stepsBuilder.add(new Step() {
                         @Override
                         public StepResult run() {
-                            RemoteRepoAccessor lhsResult = config.repoConfig.requireRemoteRepo(repo, lhsVersion);
+                            RemoteRepoAccessor lhsResult = config.localPinsRepo.requirePin(repo, lhsVersion);
                             lhsResult.remote.findCommit(overrideRepo.getRoot(), ImmutableList.of(lhsVersion));
-                            RemoteRepoAccessor mhsResult = config.repoConfig.requireRemoteRepo(repo, mhsVersion);
+                            RemoteRepoAccessor mhsResult = config.localPinsRepo.requirePin(repo, mhsVersion);
                             mhsResult.remote.findCommit(overrideRepo.getRoot(), ImmutableList.of(mhsVersion));
-                            RemoteRepoAccessor rhsResult = config.repoConfig.requireRemoteRepo(repo, rhsVersion);
+                            RemoteRepoAccessor rhsResult = config.localPinsRepo.requirePin(repo, rhsVersion);
                             rhsResult.remote.findCommit(overrideRepo.getRoot(), ImmutableList.of(rhsVersion));
 
                             if(strategy != null) {
