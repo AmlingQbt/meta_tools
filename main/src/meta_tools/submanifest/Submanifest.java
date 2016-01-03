@@ -7,11 +7,13 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import misc1.commons.Maybe;
@@ -32,7 +34,10 @@ import qbt.QbtUtils;
 import qbt.VcsTreeDigest;
 import qbt.VcsVersionDigest;
 import qbt.config.QbtConfig;
-import qbt.manifest.QbtManifest;
+import qbt.manifest.LegacyQbtManifest;
+import qbt.manifest.LegacyQbtManifestBuilder;
+import qbt.manifest.QbtManifestVersions;
+import qbt.manifest.current.QbtManifest;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.options.ParallelismOptionsDelegate;
 import qbt.tip.RepoTip;
@@ -180,7 +185,7 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
 
         ComputationTree<?> liftTree = new Side() {
             private VcsTreeDigest liftTree(VcsTreeDigest tree) {
-                QbtManifest manifest = QbtManifest.parse(tree.getRawDigest() + ":qbt-manifest", metaRepository.showFile(tree, "qbt-manifest"));
+                QbtManifest manifest = QbtManifestVersions.parse(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest")));
                 TreeAccessor treeAccessor = metaRepository.getTreeAccessor(tree);
                 byte[] importedBytes = linesToBytes(Ordering.natural().immutableSortedCopy(Iterables.transform(manifest.repos.keySet(), Functions.toStringFunction())));
                 treeAccessor = treeAccessor.replace(importedFile, importedBytes);
@@ -206,18 +211,24 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
         }.build("lift", Options.lifts);
 
         ComputationTree<?> splitTree = new Side() {
-            private VcsTreeDigest splitTree(VcsTreeDigest tree) {
-                QbtManifest manifest = QbtManifest.parse(tree.getRawDigest() + ":qbt-manifest", metaRepository.showFile(tree, "qbt-manifest"));
-                TreeAccessor treeAccessor = metaRepository.getTreeAccessor(tree);
-                byte[] importedBytes = treeAccessor.get(importedFile).rightOrNull();
-                QbtManifest.Builder newManifestBuilder = QbtManifest.TYPE.builder();
-                for(String repoString : new String(importedBytes, Charsets.UTF_8).split("\n")) {
-                    RepoTip repo = RepoTip.TYPE.parseRequire(repoString);
-                    newManifestBuilder = newManifestBuilder.with(repo, manifest.repos.get(repo).builder());
-                }
-                treeAccessor = treeAccessor.remove(importedFile);
-                treeAccessor = treeAccessor.replace("qbt-manifest", linesToBytes(newManifestBuilder.build().deparse()));
-                return treeAccessor.getDigest();
+            private VcsTreeDigest splitTree(final VcsTreeDigest tree) {
+                LegacyQbtManifest<?, ?> manifest = QbtManifestVersions.parseLegacy(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest"))).manifest;
+                return new Object() {
+                    public <M extends LegacyQbtManifest<M, B>, B extends LegacyQbtManifestBuilder<M, B>> VcsTreeDigest run(LegacyQbtManifest<M, B> manifest) {
+                        TreeAccessor treeAccessor = metaRepository.getTreeAccessor(tree);
+                        byte[] importedBytes = treeAccessor.get(importedFile).rightOrNull();
+                        ImmutableSet<RepoTip> keep = ImmutableSet.copyOf(Iterables.transform(Arrays.asList(new String(importedBytes, Charsets.UTF_8).split("\n")), RepoTip.TYPE.FROM_STRING));
+                        B newManifestBuilder = manifest.builder();
+                        for(RepoTip repo : manifest.getRepos()) {
+                            if(!keep.contains(repo)) {
+                                newManifestBuilder = newManifestBuilder.withoutRepo(repo);
+                            }
+                        }
+                        treeAccessor = treeAccessor.remove(importedFile);
+                        treeAccessor = treeAccessor.replace("qbt-manifest", linesToBytes(newManifestBuilder.build().deparse()));
+                        return treeAccessor.getDigest();
+                    }
+                }.run(manifest);
             }
 
             @Override
