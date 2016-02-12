@@ -48,9 +48,9 @@ public final class Commit extends QbtCommand<Commit.Options> {
     @QbtCommandName("commit")
     public static interface Options extends QbtCommandOptions {
         public static final OptionsLibrary<Options> o = OptionsLibrary.of();
-        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<Options>();
-        public static final ManifestOptionsDelegate<Options> manifest = new ManifestOptionsDelegate<Options>();
-        public static final RepoActionOptionsDelegate<Options> repos = new RepoActionOptionsDelegate<Options>(RepoActionOptionsDelegate.NoArgsBehaviour.OVERRIDES);
+        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<>();
+        public static final ManifestOptionsDelegate<Options> manifest = new ManifestOptionsDelegate<>();
+        public static final RepoActionOptionsDelegate<Options> repos = new RepoActionOptionsDelegate<>(RepoActionOptionsDelegate.NoArgsBehaviour.OVERRIDES);
         public static final OptionsFragment<Options, Boolean> amend = o.zeroArg("amend").transform(o.flag()).helpDesc("Amend existing commit instead of making a new one");
         public static final OptionsFragment<Options, String> metaVcs = o.oneArg("metaVcs").transform(o.singleton("git")).helpDesc("VCS for meta");
         public static final OptionsFragment<Options, String> message = o.oneArg("message", "m").transform(o.singleton(null)).helpDesc("Commit message");

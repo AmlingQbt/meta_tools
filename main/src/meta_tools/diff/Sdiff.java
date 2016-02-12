@@ -44,8 +44,8 @@ public class Sdiff extends QbtCommand<Sdiff.Options> {
     @QbtCommandName("sdiff")
     public static interface Options extends QbtCommandOptions {
         public static final OptionsLibrary<Options> o = OptionsLibrary.of();
-        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<Options>();
-        public static final CommonOptionsDelegate<Options> commonOptions = new CommonOptionsDelegate<Options>();
+        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<>();
+        public static final CommonOptionsDelegate<Options> commonOptions = new CommonOptionsDelegate<>();
         public static final OptionsFragment<Options, String> type = o.oneArg("type").transform(o.singleton(null)).helpDesc("Type of diff to show");
         public static final OptionsFragment<Options, Boolean> log = o.zeroArg("log").transform(o.flag()).helpDesc("Show a log");
         public static final OptionsFragment<Options, Boolean> diff = o.zeroArg("diff").transform(o.flag()).helpDesc("Show a diff");

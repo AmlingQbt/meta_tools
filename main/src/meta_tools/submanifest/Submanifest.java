@@ -49,9 +49,9 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
     @QbtCommandName("submanifest")
     public static interface Options extends QbtCommandOptions {
         public static final OptionsLibrary<Options> o = OptionsLibrary.of();
-        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<Options>();
+        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<>();
         public static final OptionsFragment<Options, String> metaVcs = o.oneArg("metaVcs").transform(o.singleton("git")).helpDesc("VCS for meta");
-        public static final ParallelismOptionsDelegate<Options> parallelism = new ParallelismOptionsDelegate<Options>();
+        public static final ParallelismOptionsDelegate<Options> parallelism = new ParallelismOptionsDelegate<>();
         public static final OptionsFragment<Options, String> importedFile = o.oneArg("importedFile").transform(o.singleton("imported-repos")).helpDesc("File in root of tree to use to track imported repos.");
         public static final OptionsFragment<Options, ImmutableList<String>> base = o.oneArg("base").helpDesc("Treat this commit, and any of its ancestors as bases.");
         public static final OptionsFragment<Options, ImmutableList<String>> lifts = o.oneArg("lift").helpDesc("Lift this commit.");

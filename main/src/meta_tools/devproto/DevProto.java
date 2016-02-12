@@ -63,11 +63,11 @@ public final class DevProto extends QbtCommand<DevProto.Options> {
     @QbtCommandName("devProto")
     public static interface Options extends QbtCommandOptions {
         public static final OptionsLibrary<Options> o = OptionsLibrary.of();
-        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<Options>();
-        public static final ManifestOptionsDelegate<Options> manifest = new ManifestOptionsDelegate<Options>();
-        public static final CumulativeVersionComputerOptionsDelegate<Options> cumulativeVersionComputerOptions = new CumulativeVersionComputerOptionsDelegate<Options>();
-        public static final PackageMapperHelperOptionsDelegate<Options> packageMapperHelperOptions = new PackageMapperHelperOptionsDelegate<Options>();
-        public static final PackageActionOptionsDelegate<Options> packages = new PackageActionOptionsDelegate<Options>(PackageActionOptionsDelegate.NoArgsBehaviour.EMPTY);
+        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<>();
+        public static final ManifestOptionsDelegate<Options> manifest = new ManifestOptionsDelegate<>();
+        public static final CumulativeVersionComputerOptionsDelegate<Options> cumulativeVersionComputerOptions = new CumulativeVersionComputerOptionsDelegate<>();
+        public static final PackageMapperHelperOptionsDelegate<Options> packageMapperHelperOptions = new PackageMapperHelperOptionsDelegate<>();
+        public static final PackageActionOptionsDelegate<Options> packages = new PackageActionOptionsDelegate<>(PackageActionOptionsDelegate.NoArgsBehaviour.EMPTY);
         public static final OptionsFragment<Options, String> proto = o.oneArg("proto").transform(o.singleton()).helpDesc("Protocol to run");
     }
 
@@ -138,7 +138,7 @@ public final class DevProto extends QbtCommand<DevProto.Options> {
                     final CvRecursivePackageDataComputationMapper<CumulativeVersionComputer.Result, CvRecursivePackageData<CumulativeVersionComputer.Result>, CvRecursivePackageData<ArtifactReference>> buildComputationMapper = new CvRecursivePackageDataComputationMapper<CumulativeVersionComputer.Result, CvRecursivePackageData<CumulativeVersionComputer.Result>, CvRecursivePackageData<ArtifactReference>>() {
                         @Override
                         protected CvRecursivePackageData<ArtifactReference> map(CvRecursivePackageData<CumulativeVersionComputer.Result> requireRepoResults, Map<String, Pair<NormalDependencyType, CvRecursivePackageData<ArtifactReference>>> dependencyResults) {
-                            return new CvRecursivePackageData<ArtifactReference>(requireRepoResults.v, cb.runBuild(new BuildData(requireRepoResults, dependencyResults)), dependencyResults);
+                            return new CvRecursivePackageData<>(requireRepoResults.v, cb.runBuild(new BuildData(requireRepoResults, dependencyResults)), dependencyResults);
                         }
                     };
                     final LoadingCache<CumulativeVersionComputer.Result, Maybe<ImmutableList<DevProtoInput>>> readInputs = CacheBuilder.newBuilder().build(new CacheLoader<CumulativeVersionComputer.Result, Maybe<ImmutableList<DevProtoInput>>>() {

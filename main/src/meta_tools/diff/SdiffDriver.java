@@ -24,7 +24,7 @@ public class SdiffDriver extends QbtCommand<SdiffDriver.Options> {
     @QbtCommandName("sdiffDriver")
     public static interface Options extends QbtCommandOptions {
         public static final OptionsLibrary<Options> o = OptionsLibrary.of();
-        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<Options>();
+        public static final ConfigOptionsDelegate<Options> config = new ConfigOptionsDelegate<>();
         public static final Sdiff.CommonOptionsDelegate<Options> commonOptions = new Sdiff.CommonOptionsDelegate<Options>();
 
         // path old-file old-hex old-mode new-file new-hex new-mode
