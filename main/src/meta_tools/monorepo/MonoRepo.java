@@ -1,13 +1,7 @@
 package meta_tools.submanifest;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Ordering;
 import java.nio.file.Path;
-import java.util.Arrays;
 import meta_tools.utils.HistoryRebuilder;
 import misc1.commons.concurrent.ctree.ComputationTree;
 import misc1.commons.options.OptionsFragment;
@@ -21,16 +15,12 @@ import qbt.QbtCommand;
 import qbt.QbtCommandName;
 import qbt.QbtCommandOptions;
 import qbt.QbtUtils;
-import qbt.VcsTreeDigest;
 import qbt.VcsVersionDigest;
 import qbt.config.QbtConfig;
-import qbt.manifest.current.QbtManifest;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.options.ParallelismOptionsDelegate;
-import qbt.tip.RepoTip;
 import qbt.vcs.CommitData;
 import qbt.vcs.Repository;
-import qbt.vcs.TreeAccessor;
 import qbt.vcs.VcsRegistry;
 
 public class MonoRepo extends QbtCommand<MonoRepo.Options> {
@@ -94,9 +84,9 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             }
         }
 
-        ComputationTree<?> inlineTree = new Side("inline") {
+        Side inlineSide = new Side("inline") {
             @Override
-            protected VcsVersionDigest mapBase(VcsVersionDigest base) {
+            protected ComputationTree<VcsVersionDigest> mapBase(VcsVersionDigest base) {
                 CommitData.Builder cd = metaRepository.getCommitData(base).builder();
                 if(parseHeader(cd.get(CommitData.MESSAGE)) != null) {
                     throw new IllegalStateException("Commit already has header: " + base);
@@ -104,11 +94,11 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 cd = cd.set(CommitData.PARENTS, ImmutableList.of(base));
                 cd = cd.set(CommitData.MESSAGE, "(monoRepo inline)");
                 cd = addHeader(cd, base);
-                return metaRepository.createCommit(cd.build());
+                return ComputationTree.constant(metaRepository.createCommit(cd.build()));
             }
 
             @Override
-            protected VcsVersionDigest map(VcsVersionDigest commit, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
+            protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest commit, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
                 if(parseHeader(cd.get(CommitData.MESSAGE)) != null) {
                     throw new IllegalStateException("Commit already has header: " + commit);
                 }
@@ -120,24 +110,30 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     inlined = addHeader(inlined, commit);
                 }
 
-                return metaRepository.createCommit(inlined.build());
+                return ComputationTree.constant(metaRepository.createCommit(inlined.build()));
             }
-        }.buildMany(options.get(Options.inlines));
+        };
+        ComputationTree<?> inlineTree = inlineSide.buildMany(options.get(Options.inlines));
 
         ComputationTree<?> extractTree = new Side("extract") {
             @Override
-            protected VcsVersionDigest mapBase(VcsVersionDigest base) {
-                return base;
+            protected ComputationTree<VcsVersionDigest> mapBase(VcsVersionDigest base) {
+                return ComputationTree.constant(base);
             }
 
             @Override
-            protected VcsVersionDigest map(VcsVersionDigest next, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
+            protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest commit, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
                 Pair<String, VcsVersionDigest> header = parseHeader(cd.get(CommitData.MESSAGE));
                 if(header == null) {
-                    return metaRepository.createCommit(naiveExtract(cd.builder().set(CommitData.PARENTS, parents)).build());
+                    return ComputationTree.constant(metaRepository.createCommit(naiveExtract(cd.builder().set(CommitData.PARENTS, parents)).build()));
                 }
-                // TODO: validate header
-                return header.getRight();
+                VcsVersionDigest alleged = header.getRight();
+                return inlineSide.build(alleged).transform((reinlined) -> {
+                    if(reinlined.equals(commit)) {
+                        return alleged;
+                    }
+                    throw new IllegalStateException("Illegal header on: " + commit);
+                });
             }
         }.buildMany(options.get(Options.extracts));
 
@@ -145,24 +141,27 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
         return 0;
     }
 
-    private static byte[] linesToBytes(Iterable<String> lines) {
-        StringBuilder sb = new StringBuilder();
-        for(String line : lines) {
-            sb.append(line);
-            sb.append('\n');
-        }
-        return sb.toString().getBytes(Charsets.UTF_8);
-    }
+    private static final String HEADER_SEP = "\n\nX-MonoRepo-Commit: ";
 
     private static CommitData.Builder addHeader(CommitData.Builder cd, VcsVersionDigest commit) {
+        return cd.transform(CommitData.MESSAGE, (msg) -> msg + HEADER_SEP + commit.getRawDigest());
     }
 
     private static Pair<String, VcsVersionDigest> parseHeader(String message) {
+        int i = message.lastIndexOf(HEADER_SEP);
+        if(i == -1) {
+            return null;
+        }
+        return Pair.of(message.substring(0, i), VcsVersionDigest.PARSE_FUNCTION.apply(message.substring(i + HEADER_SEP.length())));
     }
 
     private static CommitData.Builder naiveInline(CommitData.Builder cd) {
+        // TODO
+        return cd;
     }
 
     private static CommitData.Builder naiveExtract(CommitData.Builder cd) {
+        // TODO
+        return cd;
     }
 }
