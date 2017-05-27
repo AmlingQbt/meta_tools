@@ -74,6 +74,19 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             bases = b.build();
         }
 
+        class Naive {
+            public CommitData.Builder inline(CommitData.Builder cd) {
+                // TODO
+                return cd;
+            }
+
+            public CommitData.Builder extract(CommitData.Builder cd) {
+                // TODO
+                return cd;
+            }
+        }
+        Naive naive = new Naive();
+
         abstract class Side extends HistoryRebuilder {
             private final String sideName;
 
@@ -103,8 +116,8 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     throw new IllegalStateException("Commit already has header: " + commit);
                 }
 
-                CommitData.Builder inlined = naiveInline(cd.builder().set(CommitData.PARENTS, parents));
-                CommitData.Builder naiveExtract = naiveExtract(inlined);
+                CommitData.Builder inlined = naive.inline(cd.builder().set(CommitData.PARENTS, parents));
+                CommitData.Builder naiveExtract = naive.extract(inlined);
 
                 if(!cd.equals(naiveExtract)) {
                     inlined = addHeader(inlined, commit);
@@ -125,7 +138,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest commit, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
                 Pair<String, VcsVersionDigest> header = parseHeader(cd.get(CommitData.MESSAGE));
                 if(header == null) {
-                    return ComputationTree.constant(metaRepository.createCommit(naiveExtract(cd.builder().set(CommitData.PARENTS, parents)).build()));
+                    return ComputationTree.constant(metaRepository.createCommit(naive.extract(cd.builder().set(CommitData.PARENTS, parents)).build()));
                 }
                 VcsVersionDigest alleged = header.getRight();
                 return inlineSide.build(alleged).transform((reinlined) -> {
@@ -153,15 +166,5 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             return null;
         }
         return Pair.of(message.substring(0, i), VcsVersionDigest.PARSE_FUNCTION.apply(message.substring(i + HEADER_SEP.length())));
-    }
-
-    private static CommitData.Builder naiveInline(CommitData.Builder cd) {
-        // TODO
-        return cd;
-    }
-
-    private static CommitData.Builder naiveExtract(CommitData.Builder cd) {
-        // TODO
-        return cd;
     }
 }
