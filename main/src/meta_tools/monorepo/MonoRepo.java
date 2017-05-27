@@ -19,6 +19,7 @@ import qbt.VcsVersionDigest;
 import qbt.config.QbtConfig;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.options.ParallelismOptionsDelegate;
+import qbt.options.RepoActionOptionsDelegate;
 import qbt.vcs.CommitData;
 import qbt.vcs.Repository;
 import qbt.vcs.VcsRegistry;
@@ -35,6 +36,9 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
         public static final OptionsFragment<Options, ImmutableList<String>> base = o.oneArg("base").helpDesc("Treat this commit, and any of its ancestors as bases.");
         public static final OptionsFragment<Options, ImmutableList<String>> inlines = o.oneArg("inline").helpDesc("Inline this commit.");
         public static final OptionsFragment<Options, ImmutableList<String>> extracts = o.oneArg("extract").helpDesc("Extract this commit.");
+        public static final RepoActionOptionsDelegate<Options> repos = new RepoActionOptionsDelegate<Options>(RepoActionOptionsDelegate.NoArgsBehaviour.THROW);
+        public static final OptionsFragment<Options, String> inlinedRepoName = o.oneArg("inlinedRepoName").transform(o.singleton("inlined"));
+        public static final OptionsFragment<Options, String> inlinedPrefix = o.oneArg("inlinedPrefix").transform(o.singleton("inlined"));
     }
 
     @Override
