@@ -5,5 +5,6 @@ meta_tools.diff.Sdiff
 meta_tools.diff.SdiffDriver
 meta_tools.merge.MergeDriver
 meta_tools.merge.ResolveManifestConflicts
+meta_tools.monorepo.MonoRepo
 meta_tools.status.OverrideStatus
 meta_tools.submanifest.Submanifest
