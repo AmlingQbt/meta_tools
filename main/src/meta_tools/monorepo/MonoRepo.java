@@ -1,4 +1,4 @@
-package meta_tools.submanifest;
+package meta_tools.monorepo;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import meta_tools.submanifest.Submanifest;
 import meta_tools.utils.HistoryRebuilder;
+import misc1.commons.Either;
 import misc1.commons.concurrent.ctree.ComputationTree;
 import misc1.commons.options.OptionsFragment;
 import misc1.commons.options.OptionsLibrary;
@@ -145,7 +146,8 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 QbtManifest manifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest")));
 
                 TreeAccessor newTree = metaRepository.getTreeAccessor(tree);
-                TreeAccessor inlinedTree = newTree.get(inlinedPrefix).leftOrNull();
+                Either<TreeAccessor, byte[]> inlinedTreeEither = newTree.get(inlinedPrefix);
+                TreeAccessor inlinedTree = inlinedTreeEither == null ? null : inlinedTreeEither.leftOrNull();
                 if(inlinedTree == null) {
                     inlinedTree = metaRepository.getEmptyTreeAccessor();
                 }
@@ -272,7 +274,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 CommitData.Builder inlined = naive.inline(cd.builder().set(CommitData.PARENTS, parents));
                 CommitData.Builder naiveExtract = naive.extract(inlined);
 
-                if(!cd.equals(naiveExtract)) {
+                if(!cd.equals(naiveExtract.build())) {
                     inlined = addHeader(inlined, commit);
                 }
 
