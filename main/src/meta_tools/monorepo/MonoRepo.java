@@ -150,23 +150,88 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 }
                 newTree = newTree.remove(inlinedPrefix);
 
-                ImmutableList.Builder<RepoTip> reposBuilder = ImmutableList.builder();
+                ImmutableSet.Builder<RepoTip> reposBuilder = ImmutableSet.builder();
                 for(String repoString : inlinedTree.getEntryNames()) {
                     reposBuilder.add(RepoTip.TYPE.parseRequire(repoString));
                 }
-                ImmutableList<RepoTip> repos = reposBuilder.build();
+                ImmutableSet<RepoTip> repos = reposBuilder.build();
 
                 QbtManifest.Builder newManifest = manifest.builder();
                 for(RepoTip repo : repos) {
                     RepoManifest.Builder repoManifest = RepoManifest.TYPE.builder();
 
-                    // TODO: packages
+                    RepoTip inlinedRepoTip = RepoTip.TYPE.of(inlinedRepoName, repo.tip);
 
-                    repoManifest = repoManifest.set(RepoManifest.VERSION, VERSION());
+                    RepoManifest.Builder inlinedManifest = newManifest.get(inlinedRepoTip);
+                    if(inlinedManifest == null) {
+                        inlinedManifest = RepoManifest.TYPE.builder();
+                        inlinedManifest = inlinedManifest.set(RepoManifest.VERSION, Optional.empty());
+                    }
+
+                    String inlinedRepoPrefix = combinePrefix(inlinedPrefix, repo.toString());
+
+                    for(Map.Entry<String, PackageManifest.Builder> e : inlinedManifest.get(RepoManifest.PACKAGES).map.entries()) {
+                        String prefix = e.getValue().get(PackageManifest.METADATA).get(PackageMetadata.PREFIX);
+                        String subprefix;
+                        if(prefix.equals(inlinedRepoPrefix)) {
+                            subprefix = "";
+                        }
+                        else if(prefix.startsWith(inlinedRepoPrefix + "/")) {
+                            subprefix = prefix.substring(inlinedRepoPrefix + 1);
+                        }
+                        else {
+                            continue;
+                        }
+
+                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.remove(e.getKey()));
+                        PackageMetadata.Builder packageManifest = e.getValue().transform(PackageMetadata.METADATA, (md) -> md.with(PackageMetadata.PREFIX, subprefix));
+
+                        repoManifest = repoManifest.transform(Package.PACKAGES, (rmp) -> rmp.with(e.getKey(), packageManifest));
+                    }
+
+                    VcsTreeDigest repoTree = inlinedTree.get(repo.toString()).leftOrNull();
+                    ImmutableList.Builder<VcsVersionDigest> satelliteParents = ImmutableList.builder();
+                    for(VcsVersionDigest metaParent : cd.get(CommitData.PARENTS)) {
+                        QbtManifest parentManifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(metaParent, "qbt-manifest")));
+                        RepoManifest parentRepoManifest = parentManifest.get(repo);
+                        if(parentRepoManifest == null) {
+                            continue;
+                        }
+                        satelliteParents.add(parentRepoManifest.get(RepoManifest.VERSION).get());
+                    }
+                    CommitData satelliteCd = cd;
+                    satelliteCd = satelliteCd.set(CommitData.TREE, repoTree);
+                    satelliteCd = satelliteCd.set(CommitData.PARENTS, satelliteParents.build());
+                    VcsVersionDigest repoVersion = HistoryRebuilder.cleanUpAndCommit(satelliteCd);
+                    config.localPinsRepo.addPin(repo, metaRepository, repoVersion);
+
+                    repoManifest = repoManifest.set(RepoManifest.VERSION, repoVersion);
                     newManifest = newManifest.with(repo, repoManifest);
+
+                    newManifest = newManifest.with(inlinedRepoTip, inlinedManifest);
                 }
 
-                newTree = newTree.replace("qbt-manifest", Submanifest.linesToBytes(config.manifestParser.deparse(newManifest.build())));
+                // remove remaining inlined repos, all must be empty
+                for(Map.Entry<RepoTip, RepoManifest.Builder> e : newManifest.map.entries()) {
+                    if(!e.getKey().getName().equals(inlinedRepoName)) {
+                        continue;
+                    }
+                    if(e.getValue().get(RepoManifest.PACKAGES).map.isEmpty()) {
+                        newManifest = newManifest.remove(e.getValue());
+                        continue;
+                    }
+                    throw new IllegalArgumentException("Ended up with non-empty inlined repo at end of extract: " + e.getKey());
+                }
+
+                QbtManifest newManifestBuilt = newManifest.build();
+
+                // check would-be inlined packages agree
+                ImmutableSet<RepoTip> repos2 = Options.repos.getRepos(config, newManifestBuilt, options);
+                if(!repos.equals(repos2)) {
+                    throw new IllegalArgumentException("Disagreement about what should have been inlined: " + repos + " versus " + repos2);
+                }
+
+                newTree = newTree.replace("qbt-manifest", Submanifest.linesToBytes(config.manifestParser.deparse(newManifestBuilt)));
                 cd = cd.set(CommitData.TREE, newTree.getDigest());
 
                 return cd;
