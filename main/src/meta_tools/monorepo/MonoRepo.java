@@ -2,6 +2,9 @@ package meta_tools.submanifest;
 
 import com.google.common.collect.ImmutableList;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
 import meta_tools.utils.HistoryRebuilder;
 import misc1.commons.concurrent.ctree.ComputationTree;
 import misc1.commons.options.OptionsFragment;
@@ -15,13 +18,20 @@ import qbt.QbtCommand;
 import qbt.QbtCommandName;
 import qbt.QbtCommandOptions;
 import qbt.QbtUtils;
+import qbt.VcsTreeDigest;
 import qbt.VcsVersionDigest;
 import qbt.config.QbtConfig;
+import qbt.manifest.current.PackageManifest;
+import qbt.manifest.current.PackageMetadata;
+import qbt.manifest.current.QbtManifest;
+import qbt.manifest.current.RepoManifest;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.options.ParallelismOptionsDelegate;
 import qbt.options.RepoActionOptionsDelegate;
+import qbt.tip.RepoTip;
 import qbt.vcs.CommitData;
 import qbt.vcs.Repository;
+import qbt.vcs.TreeAccessor;
 import qbt.vcs.VcsRegistry;
 
 public class MonoRepo extends QbtCommand<MonoRepo.Options> {
@@ -78,9 +88,46 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             bases = b.build();
         }
 
+        String inlinedRepoName = options.get(Options.inlinedRepoName);
+        String inlinedPrefix = options.get(Options.inlinedPrefix);
         class Naive {
             public CommitData.Builder inline(CommitData.Builder cd) {
-                // TODO
+                VcsTreeDigest tree = cd.get(CommitData.TREE);
+                QbtManifest manifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest")));
+                Collection<RepoTip> repos = Options.repos.getRepos(config, manifest, options);
+
+                QbtManifest.Builder newManifest = manifest.builder();
+                RepoManifest.Builder inlinedManifest = RepoManifest.TYPE.builder();
+                inlinedManifest = inlinedManifest.set(RepoManifest.VERSION, Optional.empty());
+                TreeAccessor newTree = metaRepository.getTreeAccessor(tree);
+                for(RepoTip repo : repos) {
+                    newManifest = newManifest.without(repo);
+                    RepoManifest repoManifest = manifest.repos.get(repo);
+
+                    String inlinedRepoPrefix = combinePrefix(inlinedPrefix, repo.toString());
+
+                    for(Map.Entry<String, PackageManifest> e : repoManifest.packages.entrySet()) {
+                        PackageManifest.Builder newPackageManifest = e.getValue().builder();
+                        newPackageManifest = newPackageManifest.transform(PackageManifest.METADATA, (pm) -> pm.transform(PackageMetadata.PREFIX, (prefix) -> combinePrefix(inlinedRepoPrefix, prefix)));
+                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(repo.toPackage(e.getKey()), newPackageManifest));
+                    }
+
+                    VcsVersionDigest repoVersion = repoManifest.get(RepoManifest.VERSION).get();
+                    PinnedRepoAccessor pinnedRepoAccessor = config.localPinsRepo.requirePin(repo, repoVersion);
+                    pinnedRepoAccessor.findCommit(metaRepository.getRoot());
+
+                    TreeAccessor repoTree = metaRepository.getTreeAccessor(metaRepository.getSubtree(repoVersion, ""));
+                    if(repoTree.isEmpty()) {
+                        throw new IllegalStateException("Cannot inlined empty repo: " + repo);
+                    }
+
+                    newTree = newTree.replace(inlinedRepoPrefix, repoTree);
+                }
+
+                newManifest = newManifest.set(inlinedRepoName, inlinedManifest);
+                newTree = null;
+                cd = cd.set(CommitData.TREE, newTree);
+
                 return cd;
             }
 
@@ -170,5 +217,15 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             return null;
         }
         return Pair.of(message.substring(0, i), VcsVersionDigest.PARSE_FUNCTION.apply(message.substring(i + HEADER_SEP.length())));
+    }
+
+    private static String combinePrefix(String a, String b) {
+        if(a.isEmpty()) {
+            return b;
+        }
+        if(b.isEmpty()) {
+            return a;
+        }
+        return a + "/" + b;
     }
 }
