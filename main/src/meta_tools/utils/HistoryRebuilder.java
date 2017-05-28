@@ -54,7 +54,7 @@ public abstract class HistoryRebuilder {
 
     private ComputationTree<VcsVersionDigest> buildUncached(VcsVersionDigest commit) {
         if(bases.contains(commit)) {
-            return ComputationTree.ofSupplier(() -> {
+            return ComputationTree.constant().transformExec((ignored) -> {
                 LOGGER.debug("Processing " + label + " of [base] " + commit + "...");
                 return mapBase(commit);
             });
@@ -67,14 +67,14 @@ public abstract class HistoryRebuilder {
             parentComputationTreesBuilder.add(build(parent));
         }
 
-        return ComputationTree.list(parentComputationTreesBuilder.build()).transform((parentResults) -> {
+        return ComputationTree.list(parentComputationTreesBuilder.build()).transformExec((parentResults) -> {
             LOGGER.debug("Processing " + label + " of " + commit + "...");
             return map(commit, cd, parentResults);
         });
     }
 
-    protected abstract VcsVersionDigest mapBase(VcsVersionDigest base);
-    protected abstract VcsVersionDigest map(VcsVersionDigest next, CommitData cd, ImmutableList<VcsVersionDigest> parents);
+    protected abstract ComputationTree<VcsVersionDigest> mapBase(VcsVersionDigest base);
+    protected abstract ComputationTree<VcsVersionDigest> map(VcsVersionDigest next, CommitData cd, ImmutableList<VcsVersionDigest> parents);
 
     public static VcsVersionDigest cleanUpAndCommit(Repository repo, CommitData cd) {
         List<VcsVersionDigest> keptParents = Lists.newArrayList();
