@@ -127,7 +127,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
 
                     TreeAccessor repoTree = metaRepository.getTreeAccessor(metaRepository.getSubtree(repoVersion, ""));
                     if(repoTree.isEmpty()) {
-                        throw new IllegalStateException("Cannot inlined empty repo: " + repo);
+                        throw new IllegalStateException("Cannot inline empty repo: " + repo);
                     }
 
                     newTree = newTree.replace(inlinedRepoPrefix, repoTree);
@@ -140,7 +140,35 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             }
 
             public CommitData.Builder extract(CommitData.Builder cd) {
-                // TODO
+                VcsTreeDigest tree = cd.get(CommitData.TREE);
+                QbtManifest manifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest")));
+
+                TreeAccessor newTree = metaRepository.getTreeAccessor(tree);
+                TreeAccessor inlinedTree = newTree.get(inlinedPrefix).leftOrNull();
+                if(inlinedTree == null) {
+                    inlinedTree = metaRepository.getEmptyTreeAccessor();
+                }
+                newTree = newTree.remove(inlinedPrefix);
+
+                ImmutableList.Builder<RepoTip> reposBuilder = ImmutableList.builder();
+                for(String repoString : inlinedTree.getEntryNames()) {
+                    reposBuilder.add(RepoTip.TYPE.parseRequire(repoString));
+                }
+                ImmutableList<RepoTip> repos = reposBuilder.build();
+
+                QbtManifest.Builder newManifest = manifest.builder();
+                for(RepoTip repo : repos) {
+                    RepoManifest.Builder repoManifest = RepoManifest.TYPE.builder();
+
+                    // TODO: packages
+
+                    repoManifest = repoManifest.set(RepoManifest.VERSION, VERSION());
+                    newManifest = newManifest.with(repo, repoManifest);
+                }
+
+                newTree = newTree.replace("qbt-manifest", Submanifest.linesToBytes(config.manifestParser.deparse(newManifest.build())));
+                cd = cd.set(CommitData.TREE, newTree.getDigest());
+
                 return cd;
             }
         }
