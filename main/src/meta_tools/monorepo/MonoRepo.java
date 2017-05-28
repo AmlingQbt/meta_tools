@@ -52,6 +52,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
         public static final RepoActionOptionsDelegate<Options> repos = new RepoActionOptionsDelegate<Options>(RepoActionOptionsDelegate.NoArgsBehaviour.THROW);
         public static final OptionsFragment<Options, String> inlinedRepoName = o.oneArg("inlinedRepoName").transform(o.singleton("inlined"));
         public static final OptionsFragment<Options, String> inlinedPrefix = o.oneArg("inlinedPrefix").transform(o.singleton("inlined"));
+        public static final OptionsFragment<Options, String> inlinedPlaceholder = o.oneArg("inlinedPlaceholder").transform(o.singleton(".qbtkeep"));
     }
 
     @Override
@@ -93,6 +94,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
 
         String inlinedRepoName = options.get(Options.inlinedRepoName);
         String inlinedPrefix = options.get(Options.inlinedPrefix);
+        String inlinedPlaceholder = options.get(Options.inlinedPlaceholder);
         class Naive {
             public CommitData.Builder inline(CommitData.Builder cd) {
                 VcsTreeDigest tree = cd.get(CommitData.TREE);
@@ -127,9 +129,10 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     pinnedRepoAccessor.findCommit(metaRepository.getRoot());
 
                     TreeAccessor repoTree = metaRepository.getTreeAccessor(metaRepository.getSubtree(repoVersion, ""));
-                    if(repoTree.isEmpty()) {
-                        throw new IllegalStateException("Cannot inline empty repo: " + repo);
+                    if(repoTree.get(inlinedPlaceholder) != null) {
+                        throw new IllegalStateException("Repo already has " + inlinedPlaceholder + ": " + repo + " in " + repoVersion);
                     }
+                    repoTree = repoTree.replace(inlinedPlaceholder, new byte[0]);
 
                     newTree = newTree.replace(inlinedRepoPrefix, repoTree);
                 }
@@ -191,7 +194,13 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                         repoManifest = repoManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(e.getKey(), packageManifest));
                     }
 
-                    VcsTreeDigest repoTree = inlinedTree.get(repo.toString()).leftOrNull().getDigest();
+                    TreeAccessor repoTree = inlinedTree.get(repo.toString()).leftOrNull();
+                    Either<TreeAccessor, byte[]> placeholderEither = repoTree.get(inlinedPlaceholder);
+                    if(placeholderEither == null || placeholderEither.isLeft() || placeholderEither.rightOrNull().length != 0) {
+                        throw new IllegalStateException("Repo does not have valid " + inlinedPlaceholder + ": " + repo);
+                    }
+                    repoTree = repoTree.remove(inlinedPlaceholder);
+
                     ImmutableList.Builder<VcsVersionDigest> satelliteParents = ImmutableList.builder();
                     for(VcsVersionDigest metaParent : cd.get(CommitData.PARENTS)) {
                         QbtManifest parentManifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(metaParent, "qbt-manifest")));
@@ -202,7 +211,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                         satelliteParents.add(parentRepoManifest.get(RepoManifest.VERSION).get());
                     }
                     CommitData.Builder satelliteCd = cd;
-                    satelliteCd = satelliteCd.set(CommitData.TREE, repoTree);
+                    satelliteCd = satelliteCd.set(CommitData.TREE, repoTree.getDigest());
                     satelliteCd = satelliteCd.set(CommitData.PARENTS, satelliteParents.build());
                     VcsVersionDigest repoVersion = HistoryRebuilder.cleanUpAndCommit(metaRepository, satelliteCd.build());
                     if(addPins) {
