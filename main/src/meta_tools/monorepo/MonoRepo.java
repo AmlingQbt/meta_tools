@@ -1,6 +1,7 @@
 package meta_tools.submanifest;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
@@ -177,35 +178,35 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                             subprefix = "";
                         }
                         else if(prefix.startsWith(inlinedRepoPrefix + "/")) {
-                            subprefix = prefix.substring(inlinedRepoPrefix + 1);
+                            subprefix = prefix.substring(inlinedRepoPrefix.length() + 1);
                         }
                         else {
                             continue;
                         }
 
-                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.remove(e.getKey()));
-                        PackageMetadata.Builder packageManifest = e.getValue().transform(PackageMetadata.METADATA, (md) -> md.with(PackageMetadata.PREFIX, subprefix));
+                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.without(e.getKey()));
+                        PackageManifest.Builder packageManifest = e.getValue().transform(PackageManifest.METADATA, (md) -> md.set(PackageMetadata.PREFIX, subprefix));
 
-                        repoManifest = repoManifest.transform(Package.PACKAGES, (rmp) -> rmp.with(e.getKey(), packageManifest));
+                        repoManifest = repoManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(e.getKey(), packageManifest));
                     }
 
-                    VcsTreeDigest repoTree = inlinedTree.get(repo.toString()).leftOrNull();
+                    VcsTreeDigest repoTree = inlinedTree.get(repo.toString()).leftOrNull().getDigest();
                     ImmutableList.Builder<VcsVersionDigest> satelliteParents = ImmutableList.builder();
                     for(VcsVersionDigest metaParent : cd.get(CommitData.PARENTS)) {
                         QbtManifest parentManifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(metaParent, "qbt-manifest")));
-                        RepoManifest parentRepoManifest = parentManifest.get(repo);
+                        RepoManifest parentRepoManifest = parentManifest.repos.get(repo);
                         if(parentRepoManifest == null) {
                             continue;
                         }
                         satelliteParents.add(parentRepoManifest.get(RepoManifest.VERSION).get());
                     }
-                    CommitData satelliteCd = cd;
+                    CommitData.Builder satelliteCd = cd;
                     satelliteCd = satelliteCd.set(CommitData.TREE, repoTree);
                     satelliteCd = satelliteCd.set(CommitData.PARENTS, satelliteParents.build());
-                    VcsVersionDigest repoVersion = HistoryRebuilder.cleanUpAndCommit(satelliteCd);
-                    config.localPinsRepo.addPin(repo, metaRepository, repoVersion);
+                    VcsVersionDigest repoVersion = HistoryRebuilder.cleanUpAndCommit(metaRepository, satelliteCd.build());
+                    config.localPinsRepo.addPin(repo, metaRepository.getRoot(), repoVersion);
 
-                    repoManifest = repoManifest.set(RepoManifest.VERSION, repoVersion);
+                    repoManifest = repoManifest.set(RepoManifest.VERSION, Optional.of(repoVersion));
                     newManifest = newManifest.with(repo, repoManifest);
 
                     newManifest = newManifest.with(inlinedRepoTip, inlinedManifest);
@@ -213,11 +214,11 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
 
                 // remove remaining inlined repos, all must be empty
                 for(Map.Entry<RepoTip, RepoManifest.Builder> e : newManifest.map.entries()) {
-                    if(!e.getKey().getName().equals(inlinedRepoName)) {
+                    if(!e.getKey().name.equals(inlinedRepoName)) {
                         continue;
                     }
                     if(e.getValue().get(RepoManifest.PACKAGES).map.isEmpty()) {
-                        newManifest = newManifest.remove(e.getValue());
+                        newManifest = newManifest.without(e.getKey());
                         continue;
                     }
                     throw new IllegalArgumentException("Ended up with non-empty inlined repo at end of extract: " + e.getKey());
@@ -226,7 +227,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 QbtManifest newManifestBuilt = newManifest.build();
 
                 // check would-be inlined packages agree
-                ImmutableSet<RepoTip> repos2 = Options.repos.getRepos(config, newManifestBuilt, options);
+                ImmutableSet<RepoTip> repos2 = ImmutableSet.copyOf(Options.repos.getRepos(config, newManifestBuilt, options));
                 if(!repos.equals(repos2)) {
                     throw new IllegalArgumentException("Disagreement about what should have been inlined: " + repos + " versus " + repos2);
                 }
