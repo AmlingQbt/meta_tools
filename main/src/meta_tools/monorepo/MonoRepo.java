@@ -261,6 +261,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 }
                 cd = cd.set(CommitData.PARENTS, ImmutableList.of(base));
                 cd = cd.set(CommitData.MESSAGE, "(monoRepo inline)");
+                cd = naive.inline(cd);
                 cd = addHeader(cd, base);
                 return ComputationTree.constant(metaRepository.createCommit(cd.build()));
             }
