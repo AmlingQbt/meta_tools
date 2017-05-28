@@ -106,20 +106,20 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
             }
 
             @Override
-            protected VcsVersionDigest mapBase(VcsVersionDigest base) {
+            protected ComputationTree<VcsVersionDigest> mapBase(VcsVersionDigest base) {
                 CommitData.Builder cd = metaRepository.getCommitData(base).builder();
                 cd = cd.transform(CommitData.TREE, this::liftTree);
                 cd = cd.set(CommitData.PARENTS, ImmutableList.of(base));
                 cd = cd.set(CommitData.MESSAGE, "(submanifest import)");
-                return metaRepository.createCommit(cd.build());
+                return ComputationTree.constant(metaRepository.createCommit(cd.build()));
             }
 
             @Override
-            protected VcsVersionDigest map(VcsVersionDigest commit, CommitData cd0, ImmutableList<VcsVersionDigest> parents) {
+            protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest commit, CommitData cd0, ImmutableList<VcsVersionDigest> parents) {
                 CommitData.Builder cd = cd0.builder();
                 cd = cd.transform(CommitData.TREE, this::liftTree);
                 cd = cd.set(CommitData.PARENTS, parents);
-                return metaRepository.createCommit(cd.build());
+                return ComputationTree.constant(metaRepository.createCommit(cd.build()));
             }
         }.buildMany(options.get(Options.lifts));
 
@@ -141,18 +141,18 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
             }
 
             @Override
-            protected VcsVersionDigest mapBase(VcsVersionDigest base) {
-                return base;
+            protected ComputationTree<VcsVersionDigest> mapBase(VcsVersionDigest base) {
+                return ComputationTree.constant(base);
             }
 
             @Override
-            protected VcsVersionDigest map(VcsVersionDigest next, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
+            protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest next, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
                 if(parents.isEmpty()) {
                     throw new IllegalArgumentException("Root commit outside of bases!");
                 }
                 cd = cd.transform(CommitData.TREE, this::splitTree);
 
-                return cleanUpAndCommit(metaRepository, cd);
+                return ComputationTree.constant(cleanUpAndCommit(metaRepository, cd));
             }
         }.buildMany(options.get(Options.splits));
 
