@@ -119,7 +119,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                             inlinedManifest = inlinedManifest.set(RepoManifest.VERSION, Optional.empty());
                         }
                         PackageManifest.Builder newPackageManifestFinal = newPackageManifest;
-                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(repo.name, newPackageManifestFinal));
+                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(e.getKey(), newPackageManifestFinal));
                         newManifest = newManifest.with(inlinedTip, inlinedManifest);
                     }
 
