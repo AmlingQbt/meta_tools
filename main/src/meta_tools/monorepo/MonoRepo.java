@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import meta_tools.submanifest.Submanifest;
 import meta_tools.utils.HistoryRebuilder;
 import misc1.commons.concurrent.ctree.ComputationTree;
 import misc1.commons.options.OptionsFragment;
@@ -28,6 +29,7 @@ import qbt.manifest.current.RepoManifest;
 import qbt.options.ConfigOptionsDelegate;
 import qbt.options.ParallelismOptionsDelegate;
 import qbt.options.RepoActionOptionsDelegate;
+import qbt.repo.PinnedRepoAccessor;
 import qbt.tip.RepoTip;
 import qbt.vcs.CommitData;
 import qbt.vcs.Repository;
@@ -97,8 +99,6 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 Collection<RepoTip> repos = Options.repos.getRepos(config, manifest, options);
 
                 QbtManifest.Builder newManifest = manifest.builder();
-                RepoManifest.Builder inlinedManifest = RepoManifest.TYPE.builder();
-                inlinedManifest = inlinedManifest.set(RepoManifest.VERSION, Optional.empty());
                 TreeAccessor newTree = metaRepository.getTreeAccessor(tree);
                 for(RepoTip repo : repos) {
                     newManifest = newManifest.without(repo);
@@ -109,7 +109,16 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     for(Map.Entry<String, PackageManifest> e : repoManifest.packages.entrySet()) {
                         PackageManifest.Builder newPackageManifest = e.getValue().builder();
                         newPackageManifest = newPackageManifest.transform(PackageManifest.METADATA, (pm) -> pm.transform(PackageMetadata.PREFIX, (prefix) -> combinePrefix(inlinedRepoPrefix, prefix)));
-                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(repo.toPackage(e.getKey()), newPackageManifest));
+
+                        RepoTip inlinedTip = RepoTip.TYPE.of(inlinedRepoName, repo.tip);
+                        RepoManifest.Builder inlinedManifest = newManifest.get(inlinedTip);
+                        if(inlinedManifest == null) {
+                            inlinedManifest = RepoManifest.TYPE.builder();
+                            inlinedManifest = inlinedManifest.set(RepoManifest.VERSION, Optional.empty());
+                        }
+                        PackageManifest.Builder newPackageManifestFinal = newPackageManifest;
+                        inlinedManifest = inlinedManifest.transform(RepoManifest.PACKAGES, (rmp) -> rmp.with(repo.name, newPackageManifestFinal));
+                        newManifest = newManifest.with(inlinedTip, inlinedManifest);
                     }
 
                     VcsVersionDigest repoVersion = repoManifest.get(RepoManifest.VERSION).get();
@@ -124,9 +133,8 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     newTree = newTree.replace(inlinedRepoPrefix, repoTree);
                 }
 
-                newManifest = newManifest.set(inlinedRepoName, inlinedManifest);
-                newTree = null;
-                cd = cd.set(CommitData.TREE, newTree);
+                newTree = newTree.replace("qbt-manifest", Submanifest.linesToBytes(config.manifestParser.deparse(newManifest.build())));
+                cd = cd.set(CommitData.TREE, newTree.getDigest());
 
                 return cd;
             }
