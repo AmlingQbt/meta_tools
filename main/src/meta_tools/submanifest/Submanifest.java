@@ -160,7 +160,7 @@ public class Submanifest extends QbtCommand<Submanifest.Options> {
         return 0;
     }
 
-    private static byte[] linesToBytes(Iterable<String> lines) {
+    public static byte[] linesToBytes(Iterable<String> lines) {
         StringBuilder sb = new StringBuilder();
         for(String line : lines) {
             sb.append(line);
