@@ -141,7 +141,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 return cd;
             }
 
-            public CommitData.Builder extract(CommitData.Builder cd) {
+            public CommitData.Builder extract(CommitData.Builder cd, boolean addPins) {
                 VcsTreeDigest tree = cd.get(CommitData.TREE);
                 QbtManifest manifest = config.manifestParser.parse(ImmutableList.copyOf(metaRepository.showFile(tree, "qbt-manifest")));
 
@@ -206,7 +206,9 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                     satelliteCd = satelliteCd.set(CommitData.TREE, repoTree);
                     satelliteCd = satelliteCd.set(CommitData.PARENTS, satelliteParents.build());
                     VcsVersionDigest repoVersion = HistoryRebuilder.cleanUpAndCommit(metaRepository, satelliteCd.build());
-                    config.localPinsRepo.addPin(repo, metaRepository.getRoot(), repoVersion);
+                    if(addPins) {
+                        config.localPinsRepo.addPin(repo, metaRepository.getRoot(), repoVersion);
+                    }
 
                     repoManifest = repoManifest.set(RepoManifest.VERSION, Optional.of(repoVersion));
                     newManifest = newManifest.with(repo, repoManifest);
@@ -273,7 +275,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
                 }
 
                 CommitData.Builder inlined = naive.inline(cd.builder().set(CommitData.PARENTS, parents));
-                CommitData.Builder naiveExtract = naive.extract(inlined.set(CommitData.PARENTS, cd.get(CommitData.PARENTS)));
+                CommitData.Builder naiveExtract = naive.extract(inlined.set(CommitData.PARENTS, cd.get(CommitData.PARENTS)), false);
 
                 if(!cd.equals(naiveExtract.build())) {
                     inlined = addHeader(inlined, commit);
@@ -294,7 +296,7 @@ public class MonoRepo extends QbtCommand<MonoRepo.Options> {
             protected ComputationTree<VcsVersionDigest> map(VcsVersionDigest commit, CommitData cd, ImmutableList<VcsVersionDigest> parents) {
                 Pair<String, VcsVersionDigest> header = parseHeader(cd.get(CommitData.MESSAGE));
                 if(header == null) {
-                    return ComputationTree.constant(metaRepository.createCommit(naive.extract(cd.builder().set(CommitData.PARENTS, parents)).build()));
+                    return ComputationTree.constant(metaRepository.createCommit(naive.extract(cd.builder().set(CommitData.PARENTS, parents), true).build()));
                 }
                 VcsVersionDigest alleged = header.getRight();
                 return inlineSide.build(alleged).transform((reinlined) -> {
